@@ -1,11 +1,49 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'theme.dart';
+name: store_app
+description: متجر سوقك
+publish_to: 'none'
+version: 1.0.0+1
 
-void main() async {
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: trueimport 'package:flutter/material.dart';
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-  runApp(StoreApp(prefs: prefs));
+  runApp(const StoreApp());
+}
+
+class StoreTheme {
+  static const orange = Color(0xFFFF7A00);
+  static const ink = Color(0xFF1E2430);
+
+  static ThemeData get light => ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: orange,
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF7F7F9),
+      );
+
+  static ThemeData get dark => ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: orange,
+          brightness: Brightness.dark,
+        ),
+      );
 }
 
 class Product {
@@ -80,9 +118,7 @@ const products = <Product>[
 ];
 
 class StoreApp extends StatefulWidget {
-  const StoreApp({super.key, required this.prefs});
-
-  final SharedPreferences prefs;
+  const StoreApp({super.key});
 
   @override
   State<StoreApp> createState() => _StoreAppState();
@@ -90,16 +126,20 @@ class StoreApp extends StatefulWidget {
 
 class _StoreAppState extends State<StoreApp> {
   bool dark = false;
-  final cart = <int, int>{};
-  final favorites = <int>{};
+  final Map<int, int> cart = <int, int>{};
+  final Set<int> favorites = <int>{};
 
   @override
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Store',
+        title: 'سوقك',
         theme: StoreTheme.light,
         darkTheme: StoreTheme.dark,
         themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+        builder: (context, child) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: child ?? const SizedBox.shrink(),
+        ),
         home: StoreHome(
           cart: cart,
           favorites: favorites,
@@ -132,7 +172,7 @@ class _StoreHomeState extends State<StoreHome> {
   String query = '';
   String category = 'الكل';
 
-  final categories = const [
+  final List<String> categories = const [
     'الكل',
     'إلكترونيات',
     'أزياء',
@@ -148,13 +188,12 @@ class _StoreHomeState extends State<StoreHome> {
               p.category.contains(query)))
       .toList();
 
-  int get cartCount => widget.cart.values.fold(0, (a, b) => a + b);
+  int get cartCount => widget.cart.values.fold<int>(0, (a, b) => a + b);
 
-  double get total => widget.cart.entries.fold(
-        0,
+  double get total => widget.cart.entries.fold<double>(
+        0.0,
         (sum, e) =>
-            sum +
-            products.firstWhere((p) => p.id == e.key).price * e.value,
+            sum + products.firstWhere((p) => p.id == e.key).price * e.value,
       );
 
   @override
@@ -170,27 +209,31 @@ class _StoreHomeState extends State<StoreHome> {
               icon: const Icon(Icons.brightness_6_outlined),
             ),
             Stack(
-              alignment: Alignment.topRight,
+              alignment: Alignment.center,
               children: [
                 IconButton(
-                  onPressed: () => _openCart(),
+                  onPressed: () => setState(() => tab = 2),
                   icon: const Icon(Icons.shopping_bag_outlined),
                 ),
                 if (cartCount > 0)
-                  Container(
-                    width: 18,
-                    height: 18,
-                    decoration: const BoxDecoration(
-                      color: StoreTheme.orange,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '$cartCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
+                  Positioned(
+                    top: 6,
+                    right: 4,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const BoxDecoration(
+                        color: StoreTheme.orange,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$cartCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -219,14 +262,29 @@ class _StoreHomeState extends State<StoreHome> {
             ),
             NavigationDestination(
               icon: Icon(Icons.shopping_cart_outlined),
+              selectedIcon: Icon(Icons.shopping_cart),
               label: 'السلة',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
               label: 'حسابي',
             ),
           ],
         ),
+      );
+
+  Widget _grid(List<Product> items) => GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.70,
+        ),
+        itemBuilder: (_, i) => _productCard(items[i]),
       );
 
   Widget _home() => ListView(
@@ -285,18 +343,7 @@ class _StoreHomeState extends State<StoreHome> {
             ],
           ),
           const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filtered.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: .70,
-            ),
-            itemBuilder: (_, i) => _productCard(filtered[i]),
-          ),
+          _grid(filtered),
         ],
       );
 
@@ -330,6 +377,7 @@ class _StoreHomeState extends State<StoreHome> {
                     onPressed: () => setState(() => category = 'الكل'),
                     style: FilledButton.styleFrom(
                       backgroundColor: StoreTheme.orange,
+                      foregroundColor: Colors.white,
                     ),
                     child: const Text('تصفح المنتجات'),
                   ),
@@ -346,104 +394,99 @@ class _StoreHomeState extends State<StoreHome> {
         ),
       );
 
-  Widget _productCard(Product p) => GestureDetector(
-        onTap: () => _details(p),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: p.color,
-                      borderRadius: BorderRadius.circular(17),
-                    ),
-                    child: Stack(
-                      children: [
-                        const Center(
-                          child: Icon(
-                            Icons.shopping_bag_outlined,
-                            size: 62,
-                            color: Colors.black38,
-                          ),
-                        ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: IconButton(
-                            onPressed: () {
-                              if (widget.favorites.contains(p.id)) {
-                                widget.favorites.remove(p.id);
-                              } else {
-                                widget.favorites.add(p.id);
-                              }
-                              widget.onChanged();
-                            },
-                            icon: Icon(
-                              widget.favorites.contains(p.id)
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: widget.favorites.contains(p.id)
-                                  ? Colors.red
-                                  : Colors.black54,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+  Widget _productCard(Product p) {
+    final fav = widget.favorites.contains(p.id);
+    return GestureDetector(
+      onTap: () => _details(p),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: p.color,
+                    borderRadius: BorderRadius.circular(17),
                   ),
-                ),
-                const SizedBox(height: 9),
-                Text(
-                  p.category,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  p.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${p.price.toStringAsFixed(0)} ر.س',
-                      style: const TextStyle(
-                        color: StoreTheme.orange,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        widget.cart[p.id] = (widget.cart[p.id] ?? 0) + 1;
-                        widget.onChanged();
-                      },
-                      child: const CircleAvatar(
-                        radius: 16,
-                        backgroundColor: StoreTheme.ink,
+                  child: Stack(
+                    children: [
+                      const Center(
                         child: Icon(
-                          Icons.add,
-                          color: Colors.white,
-                          size: 18,
+                          Icons.shopping_bag_outlined,
+                          size: 62,
+                          color: Colors.black38,
                         ),
                       ),
-                    ),
-                  ],
+                      Positioned(
+                        top: 4,
+                        left: 4,
+                        child: IconButton(
+                          onPressed: () {
+                            if (fav) {
+                              widget.favorites.remove(p.id);
+                            } else {
+                              widget.favorites.add(p.id);
+                            }
+                            widget.onChanged();
+                          },
+                          icon: Icon(
+                            fav ? Icons.favorite : Icons.favorite_border,
+                            color: fav ? Colors.red : Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 9),
+              Text(
+                p.category,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                p.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 5),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${p.price.toStringAsFixed(0)} ر.س',
+                    style: const TextStyle(
+                      color: StoreTheme.orange,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () {
+                      widget.cart[p.id] = (widget.cart[p.id] ?? 0) + 1;
+                      widget.onChanged();
+                    },
+                    child: const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: StoreTheme.ink,
+                      child: Icon(Icons.add, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _favorites() {
     final items =
@@ -462,18 +505,7 @@ class _StoreHomeState extends State<StoreHome> {
               ?.copyWith(fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: .70,
-          ),
-          itemBuilder: (_, i) => _productCard(items[i]),
-        ),
+        _grid(items),
       ],
     );
   }
@@ -611,12 +643,13 @@ class _StoreHomeState extends State<StoreHome> {
         ],
       );
 
-  void _openCart() => setState(() => tab = 2);
-
-  Future<void> _details(Product p) async => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (context) => Padding(
+  void _details(Product p) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -640,15 +673,16 @@ class _StoreHomeState extends State<StoreHome> {
               const SizedBox(height: 18),
               Text(
                 p.name,
-                style: Theme.of(context)
+                style: Theme.of(sheetContext)
                     .textTheme
                     .headlineSmall
                     ?.copyWith(fontWeight: FontWeight.w900),
               ),
+              const SizedBox(height: 6),
               Text(
                 p.description,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
                   height: 1.6,
                 ),
               ),
@@ -668,7 +702,7 @@ class _StoreHomeState extends State<StoreHome> {
                     onPressed: () {
                       widget.cart[p.id] = (widget.cart[p.id] ?? 0) + 1;
                       widget.onChanged();
-                      Navigator.pop(context);
+                      Navigator.pop(sheetContext);
                     },
                     icon: const Icon(Icons.shopping_bag_outlined),
                     label: const Text('أضف للسلة'),
@@ -678,10 +712,12 @@ class _StoreHomeState extends State<StoreHome> {
             ],
           ),
         ),
-      );
+      ),
+    );
+  }
 
   void _checkout() {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الطلب'),
