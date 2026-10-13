@@ -59,7 +59,7 @@ class Ad {
         mine: j['mine'] ?? false,
       );
 
-  Color get color =>
+  MaterialColor get color =>
       Colors.primaries[title.hashCode.abs() % Colors.primaries.length];
 }
 
@@ -597,22 +597,4 @@ class _AddPageState extends State<AddPage> {
       ),
     );
   }
-}name: my_app
-description: A Flutter app
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.0.0 <4.0.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-  shared_preferences: ^2.2.2
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-
-flutter:
-  uses-material-design: true
+}
