@@ -1,598 +1,224 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const SouqApp());
+void main() => runApp(const MyShopApp());
 
-const Map<String, IconData> kCategories = {
-  'سيارات': Icons.directions_car,
-  'عقارات': Icons.home_work,
-  'جوالات': Icons.smartphone,
-  'إلكترونيات': Icons.laptop_mac,
-  'أثاث': Icons.chair,
-  'وظائف': Icons.work,
-  'خدمات': Icons.handyman,
-  'تطبيقات': Icons.apps,
-  'أخرى': Icons.category,
-};
-
-class Ad {
-  final String id, title, category, city, desc, phone;
-  final double price;
-  final int time;
-  final bool mine;
-
-  Ad({
-    required this.id,
-    required this.title,
-    required this.category,
-    required this.city,
-    required this.desc,
-    required this.phone,
-    required this.price,
-    required this.time,
-    this.mine = false,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'category': category,
-        'city': city,
-        'desc': desc,
-        'phone': phone,
-        'price': price,
-        'time': time,
-        'mine': mine,
-      };
-
-  factory Ad.fromJson(Map<String, dynamic> j) => Ad(
-        id: j['id'],
-        title: j['title'],
-        category: j['category'],
-        city: j['city'],
-        desc: j['desc'],
-        phone: j['phone'],
-        price: (j['price'] as num).toDouble(),
-        time: j['time'],
-        mine: j['mine'] ?? false,
-      );
-
-  MaterialColor get color =>
-      Colors.primaries[title.hashCode.abs() % Colors.primaries.length];
-}
-
-String priceText(double p) => p == 0 ? 'مجاناً' : '${p.toStringAsFixed(0)} ر.س';
-
-String ago(int t) {
-  final d = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(t));
-  if (d.inMinutes < 1) return 'الآن';
-  if (d.inMinutes < 60) return 'قبل ${d.inMinutes} دقيقة';
-  if (d.inHours < 24) return 'قبل ${d.inHours} ساعة';
-  return 'قبل ${d.inDays} يوم';
-}
-
-class SouqApp extends StatelessWidget {
-  const SouqApp({super.key});
-
+class MyShopApp extends StatelessWidget {
+  const MyShopApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'سوق',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B7A75)),
-        scaffoldBackgroundColor: const Color(0xFFF5F7F8),
-      ),
-      builder: (context, child) =>
-          Directionality(textDirection: TextDirection.rtl, child: child!),
-      home: const HomePage(),
+      locale: const Locale('ar'),
+      theme: ThemeData(fontFamily: 'Cairo', scaffoldBackgroundColor: const Color(0xFFF9FAFB)),
+      home: const ShopPage(),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
+class Product {
+  final String title;
+  final int price;
+  final int oldPrice;
+  final String emoji;
+  final String cat;
+  Product(this.title, this.price, this.oldPrice, this.emoji, this.cat);
 }
 
-class _HomePageState extends State<HomePage> {
-  List<Ad> ads = [];
-  Set<String> favs = {};
-  int tab = 0;
-  String? cat;
-  String q = '';
-  bool loading = true;
-
+class ShopPage extends StatefulWidget {
+  const ShopPage({super.key});
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  State<ShopPage> createState() => _ShopPageState();
+}
 
-  Future<void> _load() async {
-    final p = await SharedPreferences.getInstance();
-    final raw = p.getString('ads');
-    if (raw != null) {
-      ads = (jsonDecode(raw) as List)
-          .map((e) => Ad.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
-    } else {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      ads = [
-        Ad(id: '1', title: 'تويوتا كامري 2020 نظيفة', category: 'سيارات', city: 'الرياض', desc: 'سيارة بحالة ممتازة، ماشية 60 ألف كم، صيانة دورية بالوكالة.', phone: '0500000001', price: 68000, time: now - 3600000),
-        Ad(id: '2', title: 'آيفون 14 برو للبيع', category: 'جوالات', city: 'جدة', desc: 'مستعمل شهرين، مع كل ملحقاته والكرتون.', phone: '0500000002', price: 3200, time: now - 7200000),
-        Ad(id: '3', title: 'تطبيق توصيل جاهز للبيع', category: 'تطبيقات', city: 'الدمام', desc: 'تطبيق Flutter كامل مع لوحة تحكم وكود المصدر.', phone: '0500000003', price: 5000, time: now - 86400000),
-        Ad(id: '4', title: 'كنب 7 مقاعد', category: 'أثاث', city: 'مكة', desc: 'كنب مودرن بحالة الجديد، السبب السفر.', phone: '0500000004', price: 900, time: now - 172800000),
-      ];
-    }
-    favs = (p.getStringList('favs') ?? []).toSet();
-    setState(() => loading = false);
-  }
+class _ShopPageState extends State<ShopPage> {
+  List<Product> allProducts = [
+    Product("ساعة ذكية فاخرة - Smart Watch", 199, 350, "⌚", "إلكترونيات"),
+    Product("سماعة بلوتوث عازلة للضوضاء", 149, 250, "🎧", "إلكترونيات"),
+    Product("حذاء رياضي نايك", 289, 400, "👟", "أزياء"),
+    Product("حقيبة ظهر للسفر", 129, 200, "🎒", "أزياء"),
+    Product("عطر عود فاخر 100مل", 249, 350, "🌸", "عطور"),
+    Product("كوب قهوة حافظ للحرارة", 59, 90, "☕", "منزل"),
+  ];
 
-  Future<void> _save() async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString('ads', jsonEncode(ads.map((e) => e.toJson()).toList()));
-    await p.setStringList('favs', favs.toList());
-  }
+  List<Product> cart = [];
+  String activeCat = "الكل";
+  String search = "";
 
-  void _toggleFav(Ad a) {
-    setState(() => favs.contains(a.id) ? favs.remove(a.id) : favs.add(a.id));
-    _save();
-  }
-
-  Future<void> _add() async {
-    final ad = await Navigator.push<Ad>(
-        context, MaterialPageRoute(builder: (_) => const AddPage()));
-    if (ad != null) {
-      setState(() => ads.insert(0, ad));
-      _save();
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('تم نشر إعلانك')));
-      }
-    }
-  }
-
-  Future<void> _open(Ad a) async {
-    final r = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(
-            builder: (_) => DetailsPage(ad: a, fav: favs.contains(a.id))));
-    if (r == 'delete') {
-      setState(() {
-        ads.removeWhere((e) => e.id == a.id);
-        favs.remove(a.id);
-      });
-      _save();
-    } else if (r == 'fav') {
-      _toggleFav(a);
-    }
-  }
-
-  List<Ad> get shown {
-    var l = ads.where((a) {
-      if (tab == 1 && !favs.contains(a.id)) return false;
-      if (tab == 2 && !a.mine) return false;
-      if (tab == 0 && cat != null && a.category != cat) return false;
-      if (q.isNotEmpty && !(a.title.contains(q) || a.desc.contains(q))) {
-        return false;
-      }
-      return true;
+  List<Product> get filtered {
+    return allProducts.where((p) {
+      bool catOk = activeCat == "الكل" || p.cat == activeCat;
+      bool searchOk = p.title.contains(search);
+      return catOk && searchOk;
     }).toList();
-    l.sort((a, b) => b.time.compareTo(a.time));
-    return l;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final list = shown;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('سوق', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: cs.primary,
-        foregroundColor: Colors.white,
-        centerTitle: true,
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _add,
-        icon: const Icon(Icons.add),
-        label: const Text('أضف إعلان'),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (i) => setState(() => tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.storefront), label: 'الرئيسية'),
-          NavigationDestination(icon: Icon(Icons.favorite), label: 'المفضلة'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'إعلاناتي'),
-        ],
-      ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Container(
-                  color: cs.primary,
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  child: TextField(
-                    onChanged: (v) => setState(() => q = v),
-                    decoration: InputDecoration(
-                      hintText: 'ابحث عن أي شيء...',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-                if (tab == 0)
-                  SizedBox(
-                    height: 52,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: ChoiceChip(
-                            label: const Text('الكل'),
-                            selected: cat == null,
-                            onSelected: (_) => setState(() => cat = null),
-                          ),
-                        ),
-                        ...kCategories.entries.map((e) => Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: ChoiceChip(
-                                avatar: Icon(e.value, size: 18),
-                                label: Text(e.key),
-                                selected: cat == e.key,
-                                onSelected: (_) => setState(() => cat = e.key),
-                              ),
-                            )),
-                      ],
-                    ),
-                  ),
-                Expanded(
-                  child: list.isEmpty
-                      ? const Center(
-                          child: Text('لا توجد إعلانات',
-                              style: TextStyle(color: Colors.grey, fontSize: 16)))
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 90),
-                          itemCount: list.length,
-                          itemBuilder: (_, i) => _AdCard(
-                            ad: list[i],
-                            fav: favs.contains(list[i].id),
-                            onTap: () => _open(list[i]),
-                            onFav: () => _toggleFav(list[i]),
-                          ),
-                        ),
-                ),
-              ],
-            ),
+  int get total => cart.fold(0, (sum, item) => sum + item.price);
+
+  void addToCart(Product p) {
+    setState(() => cart.add(p));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("تمت الإضافة للسلة ✅"), duration: Duration(milliseconds: 800)),
     );
   }
-}
-
-class _AdCard extends StatelessWidget {
-  final Ad ad;
-  final bool fav;
-  final VoidCallback onTap, onFav;
-
-  const _AdCard({
-    required this.ad,
-    required this.fav,
-    required this.onTap,
-    required this.onFav,
-  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          title: const Row(
             children: [
-              Container(
-                width: 84,
-                height: 84,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: [ad.color.shade300, ad.color.shade700],
-                    begin: Alignment.topRight,
-                    end: Alignment.bottomLeft,
-                  ),
-                ),
-                child: Icon(kCategories[ad.category] ?? Icons.category,
-                    color: Colors.white, size: 38),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(ad.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Row(children: [
-                      const Icon(Icons.location_on, size: 14, color: Colors.grey),
-                      Text(ad.city,
-                          style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                      const SizedBox(width: 8),
-                      Text(ago(ad.time),
-                          style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text(priceText(ad.price),
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: onFav,
-                icon: Icon(fav ? Icons.favorite : Icons.favorite_border,
-                    color: fav ? Colors.red : Colors.grey),
-              ),
+              Text("متجري", style: TextStyle(color: Color(0xFFFF6B00), fontWeight: FontWeight.w900, fontSize: 24)),
+              Text(".كوم", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 24)),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class DetailsPage extends StatefulWidget {
-  final Ad ad;
-  final bool fav;
-  const DetailsPage({super.key, required this.ad, required this.fav});
-
-  @override
-  State<DetailsPage> createState() => _DetailsPageState();
-}
-
-class _DetailsPageState extends State<DetailsPage> {
-  late bool fav = widget.fav;
-
-  @override
-  Widget build(BuildContext context) {
-    final ad = widget.ad;
-    final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('تفاصيل الإعلان'),
-        actions: [
-          IconButton(
-            icon: Icon(fav ? Icons.favorite : Icons.favorite_border,
-                color: fav ? Colors.red : null),
-            onPressed: () {
-              setState(() => fav = !fav);
-              Navigator.pop(context, 'fav');
-            },
-          ),
-          if (ad.mine)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () async {
-                final ok = await showDialog<bool>(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: const Text('حذف الإعلان؟'),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('إلغاء')),
-                      TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('حذف')),
-                    ],
-                  ),
-                );
-                if (ok == true && context.mounted) Navigator.pop(context, 'delete');
-              },
-            ),
-        ],
-      ),
-      body: ListView(
-        children: [
-          Container(
-            height: 220,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [ad.color.shade300, ad.color.shade800],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-              ),
-            ),
-            child: Icon(kCategories[ad.category] ?? Icons.category,
-                color: Colors.white, size: 90),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          actions: [
+            Stack(
               children: [
-                Text(ad.title,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(priceText(ad.price),
-                    style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: cs.primary)),
-                const SizedBox(height: 12),
-                Wrap(spacing: 8, children: [
-                  Chip(
-                      avatar: Icon(kCategories[ad.category], size: 16),
-                      label: Text(ad.category)),
-                  Chip(
-                      avatar: const Icon(Icons.location_on, size: 16),
-                      label: Text(ad.city)),
-                  Chip(
-                      avatar: const Icon(Icons.access_time, size: 16),
-                      label: Text(ago(ad.time))),
-                ]),
-                const Divider(height: 28),
-                const Text('الوصف',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 6),
-                Text(ad.desc, style: const TextStyle(height: 1.6, fontSize: 15)),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50)),
-                  icon: const Icon(Icons.phone),
-                  label: Text('نسخ رقم المعلن: ${ad.phone}'),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: ad.phone));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('تم نسخ الرقم')));
-                  },
-                ),
+                IconButton(icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black), onPressed: () => openCart()),
+                if (cart.isNotEmpty)
+                  Positioned(
+                    left: 5, top: 5,
+                    child: CircleAvatar(radius: 9, backgroundColor: const Color(0xFFFF6B00),
+                    child: Text("${cart.length}", style: const TextStyle(fontSize: 10, color: Colors.white))),
+                  ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class AddPage extends StatefulWidget {
-  const AddPage({super.key});
-
-  @override
-  State<AddPage> createState() => _AddPageState();
-}
-
-class _AddPageState extends State<AddPage> {
-  final _form = GlobalKey<FormState>();
-  final title = TextEditingController();
-  final price = TextEditingController();
-  final city = TextEditingController();
-  final desc = TextEditingController();
-  final phone = TextEditingController();
-  String category = kCategories.keys.first;
-
-  @override
-  void dispose() {
-    title.dispose();
-    price.dispose();
-    city.dispose();
-    desc.dispose();
-    phone.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    if (!_form.currentState!.validate()) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    Navigator.pop(
-      context,
-      Ad(
-        id: now.toString(),
-        title: title.text.trim(),
-        category: category,
-        city: city.text.trim(),
-        desc: desc.text.trim(),
-        phone: phone.text.trim(),
-        price: double.tryParse(price.text.trim()) ?? 0,
-        time: now,
-        mine: true,
-      ),
-    );
-  }
-
-  InputDecoration _dec(String label, IconData icon) => InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
+            const SizedBox(width: 10),
+          ],
         ),
-      );
-
-  String? _req(String? v) =>
-      (v == null || v.trim().isEmpty) ? 'هذا الحقل مطلوب' : null;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('إعلان جديد')),
-      body: Form(
-        key: _form,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        body: Column(
           children: [
-            TextFormField(
-                controller: title,
-                validator: _req,
-                decoration: _dec('عنوان الإعلان', Icons.title)),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: category,
-              decoration: _dec('القسم', Icons.category),
-              items: kCategories.keys
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => category = v!),
+            // بنر العرض
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFFF6B00), Color(0xFFFF9A3D)]), borderRadius: BorderRadius.circular(24)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text("عروض اليوم\nخصم حتى 50%", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    ElevatedButton(onPressed: (){setState(()=>activeCat="الكل");}, style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFFFF6B00), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))), child: const Text("تسوق الآن"))
+                  ]),
+                  const Text("🛍️", style: TextStyle(fontSize: 60)),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-                controller: price,
-                keyboardType: TextInputType.number,
-                decoration: _dec('السعر (اتركه فارغاً للمجاني)', Icons.payments)),
-            const SizedBox(height: 12),
-            TextFormField(
-                controller: city,
-                validator: _req,
-                decoration: _dec('المدينة', Icons.location_city)),
-            const SizedBox(height: 12),
-            TextFormField(
-                controller: phone,
-                validator: _req,
-                keyboardType: TextInputType.phone,
-                decoration: _dec('رقم التواصل', Icons.phone)),
-            const SizedBox(height: 12),
-            TextFormField(
-                controller: desc,
-                validator: _req,
-                maxLines: 5,
-                decoration: _dec('الوصف', Icons.description)),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              style:
-                  FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-              onPressed: _submit,
-              icon: const Icon(Icons.check),
-              label: const Text('نشر الإعلان'),
+            // بحث
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                onChanged: (v) => setState(() => search = v),
+                decoration: InputDecoration(hintText: "ابحث عن منتج...", prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none)),
+              ),
+            ),
+            // أقسام
+            SizedBox(
+              height: 50,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                children: ["الكل", "إلكترونيات", "أزياء", "عطور", "منزل"].map((c) {
+                  bool isActive = activeCat == c;
+                  return GestureDetector(
+                    onTap: () => setState(() => activeCat = c),
+                    child: Container(
+                      margin: const EdgeInsets.only(left: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                      decoration: BoxDecoration(color: isActive? Colors.black : Colors.white, borderRadius: BorderRadius.circular(30), border: Border.all(color: Colors.grey.shade200)),
+                      child: Text(c, style: TextStyle(color: isActive? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            // منتجات
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 0.68, crossAxisSpacing: 10, mainAxisSpacing: 10),
+                itemCount: filtered.length,
+                itemBuilder: (context, i) {
+                  var p = filtered[i];
+                  return Container(
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)]),
+                    child: Column(
+                      children: [
+                        Expanded(child: Container(margin: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(14)), child: Center(child: Text(p.emoji, style: const TextStyle(fontSize: 50))))),
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Column(
+                            children: [
+                              Text(p.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                              const SizedBox(height: 4),
+                              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                Text("${p.oldPrice} ر.س", style: const TextStyle(fontSize: 10, color: Colors.grey, decoration: TextDecoration.lineThrough)),
+                                const SizedBox(width: 4),
+                                Text("${p.price} ر.س", style: const TextStyle(color: Color(0xFFFF6B00), fontWeight: FontWeight.w900)),
+                              ]),
+                              const SizedBox(height: 6),
+                              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () => addToCart(p), style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 8)), child: const Text("+ أضف للسلة", style: TextStyle(fontSize: 12)))),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void openCart() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModal) => Container(
+          padding: const EdgeInsets.all(16),
+          height: MediaQuery.of(context).size.height * 0.75,
+          child: Column(
+            children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const Text("سلة التسوق", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+              ]),
+              Expanded(
+                child: cart.isEmpty? const Center(child: Text("السلة فارغة 🛒")) :
+                ListView.builder(
+                  itemCount: cart.length,
+                  itemBuilder: (c, i) => ListTile(
+                    leading: Text(cart[i].emoji, style: const TextStyle(fontSize: 30)),
+                    title: Text(cart[i].title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    subtitle: Text("${cart[i].price} ر.س", style: const TextStyle(color: Color(0xFFFF6B00))),
+                    trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: (){
+                      setModal(() => cart.removeAt(i));
+                      setState((){});
+                    }),
+                  ),
+                ),
+              ),
+              const Divider(),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("الإجمالي:", style: TextStyle(fontWeight: FontWeight.bold)), Text("$total ر.س", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFFFF6B00)))]),
+              const SizedBox(height: 10),
+              SizedBox(width: double.infinity, child: ElevatedButton(onPressed: (){
+                if(cart.isEmpty) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("تم إرسال الطلب - الإجمالي $total ر.س - سنتواصل عبر واتساب 📲")));
+                setState(() => cart.clear());
+              }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B00), foregroundColor: Colors.white, padding: const EdgeInsets.all(14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text("إتمام الطلب عبر واتساب 📲", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)))),
+            ],
+          ),
         ),
       ),
     );
